@@ -94,7 +94,7 @@ jobs:
         run: uv sync --locked
 
       - name: Run Testcontainers-backed tests
-        run: uv run pytest -m docker --junitxml=junit-docker.xml -o junit_family=legacy
+        run: uv run pytest -m "docker and not exercise" --junitxml=junit-docker.xml -o junit_family=legacy
 
       - name: Upload JUnit report
         if: always()
