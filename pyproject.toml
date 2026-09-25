@@ -1,0 +1,155 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# The distribution name (learn-pytest-from-basic-to-advance) doesn't match the
+# importable package name (shop) -- this repo isn't really "a package", it's a
+# project with an app in it. This line is what makes `import shop` work everywhere
+# (alembic, uvicorn, pytest) via a single editable install, instead of everyone
+# needing their own PYTHONPATH hack. `testkit` (module 13's pytest plugin package,
+# at the repo root rather than under src/) needs the same treatment to be
+# importable AND to be discoverable via the pytest11 entry point below.
+packages = ["src/shop", "testkit"]
+
+[project]
+name = "learn-pytest-from-basic-to-advance"
+version = "0.1.0"
+description = "A hands-on curriculum for pytest, from basics to advanced mocking and integration testing"
+requires-python = ">=3.13"
+readme = "README.md"
+dependencies = [
+    # --- the app under test (src/shop) ---
+    "fastapi>=0.141,<1.0",
+    "uvicorn[standard]>=0.38",
+    "sqlalchemy[asyncio]>=2.1,<3.0",
+    "aiosqlite>=0.22",
+    "asyncpg>=0.31",
+    "alembic>=1.20",
+    "pydantic>=2.13,<3.0",
+    "pydantic-settings>=2.15",
+    "httpx>=0.28",
+    "redis>=8.1",
+]
+
+# Registers testkit/plugin.py as a pytest plugin, auto-loaded in every test run in
+# this repo the moment the project is installed (`uv sync`) -- no `conftest.py`
+# import, no `-p testkit.plugin` flag needed. See modules/13-pytest-plugins/README.md.
+[project.entry-points.pytest11]
+testkit = "testkit.plugin"
+
+[dependency-groups]
+dev = [
+    # --- pytest core + ecosystem ---
+    "pytest>=9.1,<10.0",
+    "pytest-asyncio>=1.4,<2.0",
+    "pytest-cov>=7.1",
+    "pytest-mock>=3.15",
+    "pytest-sugar>=1.1",
+    "pytest-randomly>=3.16",
+
+    # --- mocking / integration helpers used across modules ---
+    "respx>=0.23",
+    "hypothesis>=6.168",
+    "polyfactory>=3.3",
+    "testcontainers[postgres,redis]>=4.15",
+    "freezegun>=1.5",
+]
+lint = [
+    "ruff>=0.16",
+    "mypy>=2.3",
+]
+
+[tool.uv]
+default-groups = ["dev", "lint"]
+
+[tool.pytest.ini_options]
+# --- pytest-asyncio (1.x) ---
+# The `event_loop` fixture was removed in pytest-asyncio 1.0. Loop scope is now
+# controlled purely through these two ini options (or `@pytest.mark.asyncio(loop_scope=...)`
+# per-test). See modules/09-integration-foundations/README.md for the full story.
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+asyncio_default_test_loop_scope = "function"
+
+testpaths = ["modules", "src"]
+
+# -ra                     : show a short summary of everything that isn't a plain pass
+# --strict-markers        : an unregistered @pytest.mark.foo is an error, not a silent typo
+# --strict-config         : an unknown ini option is an error, not a silent no-op
+# --import-mode=importlib : every module has an exercises/test_x.py *and* a
+#                           solutions/test_x.py with the same basename, in
+#                           directories that can't be packages ("00-getting-started"
+#                           isn't a valid Python identifier). Under the default
+#                           "prepend" import mode that's an "import file mismatch"
+#                           collection error the moment both get collected together.
+#                           importlib mode names each module from its path instead of
+#                           sys.path position, so same-named files don't collide.
+#                           See modules/00-getting-started/README.md.
+# -m '...'                : exercises are TODOs (see modules/*/exercises), docker
+#                           tests need Testcontainers/Docker running -- both are
+#                           opt-in via `make ex`/`make test-docker`.
+addopts = """
+    -ra
+    --strict-markers
+    --strict-config
+    --import-mode=importlib
+    -m "not docker and not exercise"
+"""
+
+filterwarnings = [
+    "error",
+    # respx/httpx internals emit this on some transport paths; tracked upstream, harmless here.
+    "ignore::DeprecationWarning:httpx._client",
+]
+
+markers = [
+    "unit: fast, isolated tests with no real I/O",
+    "integration: tests that cross a real boundary (DB, cache, HTTP) but may use a fast substitute",
+    "docker: integration tests that need a real Postgres/Redis via Testcontainers (opt-in, `make test-docker`)",
+    "exercise: unfinished TODO tests for the learner to complete (opt-in, `make ex M=NN`)",
+    "slow: anything worth excluding from the inner dev loop",
+]
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "\\.\\.\\.",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+src = ["src", "modules"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's own DI pattern is `param: X = Depends(...)` -- a call in an argument
+# default that's meant to run once per request, not once at import time. B008
+# doesn't know that; this tells it Depends() specifically is fine.
+extend-immutable-calls = ["fastapi.Depends"]
+
+[tool.ruff.lint.per-file-ignores]
+# Exercise files intentionally compute a value and leave it unused until the
+# learner writes the assertion that uses it (or import something they'll need for
+# a TODO they haven't written yet) -- both are the TODO scaffolding, not bugs.
+"modules/*/exercises/*.py" = ["F841", "F401"]
+# Alembic-autogenerated; hand-reformatting generated migrations isn't a thing anyone
+# actually does, so this repo doesn't pretend to either.
+"migrations/versions/*.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.13"
+packages = ["shop"]
+mypy_path = "src"
+strict = true

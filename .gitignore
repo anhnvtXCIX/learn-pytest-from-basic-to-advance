@@ -1,0 +1,36 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# venv / uv
+.venv/
+uv.lock.bak
+
+# test / coverage artifacts
+.pytest_cache/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+junit.xml
+report.xml
+
+# sqlite test dbs
+*.db
+*.sqlite3
+
+# editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# env
+.env
+.env.*
+!.env.example

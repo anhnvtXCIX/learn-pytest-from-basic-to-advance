@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push to the same PR cancels the previous run's jobs instead of queueing
+# behind them -- the old commit's result is moot the moment a newer one exists.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast tier: unit tests + the SQLite-backed integration tier (modules 00-09, 11-13).
+  # No external services, runs on every push in well under a minute once uv's cache
+  # is warm. This is the job a PR waits on; it should never be slow enough to make
+  # anyone consider skipping it.
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Testing against more than one interpreter is the actual point of a
+        # matrix -- catching "works on my exact Python" bugs before a user does.
+        python-version: ["3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true # caches the resolved venv keyed on uv.lock's hash
+
+      - name: Install dependencies
+        run: uv sync --locked # fails the build if uv.lock is out of date, on purpose
+
+      - name: Run migrations (SQLite, for anything that touches the app's schema)
+        run: uv run alembic upgrade head
+
+      - name: Run tests with coverage
+        run: |
+          uv run pytest \
+            --cov --cov-report=xml --cov-report=term-missing \
+            --junitxml=junit.xml -o junit_family=legacy
+
+      # 70, not a rounder-looking 80 or 90: chosen by actually running `make cov`
+      # against this repo's own examples (75% at the time this was written) and
+      # setting the floor a little below that measured baseline -- see
+      # modules/14-ci/README.md for why an arbitrary round number is worse than a
+      # number tied to a real measurement.
+      - name: Enforce coverage floor
+        run: uv run coverage report --fail-under=70
+
+      # Uploaded even on failure -- a failed run's test report is the one you most
+      # want to inspect without re-running the whole job locally.
+      - name: Upload JUnit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-results
+          path: junit.xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+
+  # Real-infra tier: module 10's Testcontainers-based Postgres/Redis tests. A
+  # SEPARATE job, not a step in `test` above, so its result and timing are visible
+  # independently, and so `test` isn't held up by (or made to fail alongside) a
+  # transient Docker/container-registry hiccup in this one.
+  #
+  # GitHub Actions' Ubuntu runners come with a Docker daemon already available, which
+  # is exactly what Testcontainers needs -- there is no `services:` block here
+  # because Testcontainers manages its own containers programmatically (module 10),
+  # rather than the alternative style (a `services:` block starting long-lived
+  # Postgres/Redis containers alongside the job) that a project NOT using
+  # Testcontainers would reach for instead.
+  test-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Run Testcontainers-backed tests
+        run: uv run pytest -m docker --junitxml=junit-docker.xml -o junit_family=legacy
+
+      - name: Upload JUnit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-docker-results
+          path: junit-docker.xml
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - run: uv run ruff check .
+      - run: uv run mypy
