@@ -48,8 +48,9 @@ assume, and they're short.
 ## Syllabus
 
 **Part 0 — Foundations**
+
 | # | Module | Covers |
-|---|---|---|
+| --- | --- | --- |
 | 00 | [Getting started](modules/00-getting-started) | discovery, CLI flags, random test order |
 | 01 | [Test anatomy & assertions](modules/01-anatomy-and-assertions) | `raises`, `approx`, `warns` |
 | 02 | [Parametrization](modules/02-parametrization) | `parametrize`, `ids`, indirect, `pytest_generate_tests` |
@@ -57,23 +58,26 @@ assume, and they're short.
 | 04 | [Markers, config, selection](modules/04-markers-and-config) | custom markers, skip/skipif, `xfail(strict=)` |
 
 **Part 1 — Test doubles & mocking** *(weak spot #1)*
+
 | # | Module | Covers |
-|---|---|---|
+| --- | --- | --- |
 | 05 | [Test double taxonomy](modules/05-test-double-taxonomy) | dummy/stub/spy/fake/mock, the same test five ways |
 | 06 | [`unittest.mock` mechanics](modules/06-unittest-mock-mechanics) | `Mock`/`AsyncMock`, "where to patch", `autospec` |
 | 07 | [Choosing a seam](modules/07-choosing-a-seam) | DI vs `monkeypatch` vs `patch`, `freezegun`, `dependency_overrides` |
 | 08 | [Mocking HTTP with respx](modules/08-mocking-http-with-respx) | route matching, timeouts/5xx, respx vs a mocked client |
 
 **Part 2 — Integration testing** *(weak spot #2)*
+
 | # | Module | Covers |
-|---|---|---|
+| --- | --- | --- |
 | 09 | [Integration foundations](modules/09-integration-foundations) | transaction-rollback-per-test, async loop-scope pitfalls |
 | 10 | [Real infra with Testcontainers](modules/10-testcontainers) | real Postgres/Redis, real race conditions, dialect divergence |
 | 11 | [Full API tests](modules/11-full-api-tests) | `httpx` + `ASGITransport`, `polyfactory`, idempotency & concurrency |
 
 **Part 3 — Advanced**
+
 | # | Module | Covers |
-|---|---|---|
+| --- | --- | --- |
 | 12 | [Coverage & Hypothesis](modules/12-coverage-and-hypothesis) | branch coverage, property-based & stateful testing |
 | 13 | [Writing a pytest plugin](modules/13-pytest-plugins) | `pytest_addoption`, hook ordering, `testkit/` |
 | 14 | [CI](modules/14-ci) | GitHub Actions, coverage gates, JUnit XML |

@@ -27,6 +27,21 @@ failures ambiguous and the suite slow. It's fine — often correct — to *also*
 handful of true end-to-end tests (module 11's full-stack tests exist for exactly
 this), but they should be a deliberate minority, not the default shape of every test.
 
+### Walk-through: one request, one test per layer
+
+`POST /orders` with two widgets, and what's worth testing where:
+
+| Layer | Question | Example test | Rough speed |
+| --- | --- | --- | --- |
+| `domain/pricing` | Are the totals right for these lines? | `calculate_totals(...) == OrderTotals(2000, 0, 200, 2200)` | ~1 ms |
+| `services` (all fakes) | Does it charge after reserving, and release stock if payment fails? | fake gateway raises `PaymentDeclinedError`; assert fake stock is back to 5 | ~5 ms |
+| `db` (real SQLite) | Does a failed 2nd line roll back the 1st line's reservation? | two products, second under-stocked; both counts unchanged | ~20 ms |
+| `db` (real Postgres) | Do two concurrent buyers of the last unit get exactly one success? | two connections, `asyncio.gather` | ~1 s |
+| `api` | Does bad input give 422, missing key 401, out-of-stock 409? | `client.post("/orders", ...)` per case | ~10 ms |
+
+A bug in any one row is caught by that row's test and *located* by it. If you only
+wrote the API test, all five bugs would look identical: "POST /orders returned 500."
+
 ## Database testing strategy: three ways to isolate a test
 
 All three exist in real codebases; know the tradeoff.
@@ -86,6 +101,17 @@ Two different concerns that often get conflated:
   fake your way to a valid answer about whether a race condition exists. Module 10
   runs literal concurrent transactions against Testcontainers Postgres for this.
 
+```python
+# Idempotency: sequential. Same key twice -> one order, one charge.
+first  = await service.place_order(key="k1", ...)
+second = await service.place_order(key="k1", ...)
+assert first.id == second.id and len(gateway.charge_calls) == 1
+
+# Concurrency: simultaneous. Needs a REAL database and REAL parallel connections.
+results = await asyncio.gather(try_reserve(), try_reserve())   # stock == 1
+assert sorted(results) == [False, True]                        # exactly one wins
+```
+
 ## Test data management
 
 - Prefer **factories** (module 11 uses `polyfactory`) over fixture files for
@@ -98,6 +124,14 @@ Two different concerns that often get conflated:
   is relevant.
 - Never depend on **auto-incrementing IDs** having a specific value across tests;
   capture the ID a fixture/factory actually returns.
+
+```python
+# Brittle: every irrelevant field is noise, and breaks when a column is added.
+Product(id=1, sku="A", name="Widget", unit_price_cents=1000, stock_qty=0)
+
+# Intent-revealing: only what matters is stated.
+ProductFactory.build(stock_qty=0)      # "out of stock" is the whole point
+```
 
 ## CI strategy
 

@@ -16,12 +16,39 @@ partitions aren't "small numbers" and "big numbers" — they're the actual tiers
 the lowest threshold, in the 5% band, in the 10% band, in the 15% band. Module 02's
 parametrize exercises use exactly this partitioning.
 
+**Example.** Discount tiers: under $50 → 0%, $50–$99.99 → 5%, $100–$249.99 → 10%,
+$250+ → 15%. Four partitions, so four representative tests — not fifty:
+
+| Partition | Representative subtotal | Expected discount |
+| --- | --- | --- |
+| below all tiers | 2,000 | 0 |
+| 5% tier | 7,000 | 350 |
+| 10% tier | 15,000 | 1,500 |
+| 15% tier | 40,000 | 6,000 |
+
+If it works for 7,000 it will almost certainly work for 7,001 or 8,500.
+
 ## Boundary value analysis
 
 Bugs cluster at the edges of partitions (off-by-one errors, `<` vs `<=`), so test
 *at* and *adjacent to* every boundary, not just comfortably inside each partition.
 For a threshold at 5,000 cents: test 4,999, 5,000, and 5,001 — three cases, not one,
 and specifically the three most likely to catch a real mistake.
+
+**Example.** Discount tier edge at 5,000 (verified against `calculate_discount_cents`):
+
+```python
+@pytest.mark.parametrize("subtotal, expected", [
+    (4_999, 0),      # one below: no discount
+    (5_000, 250),    # exactly on the boundary: 5% applies
+    (5_001, 250),    # one above: 5% (250.05 rounds to 250)
+])
+def test_lowest_tier_boundary(subtotal, expected):
+    assert calculate_discount_cents(subtotal) == expected
+```
+
+A bug like `>` instead of `>=` passes every "comfortably inside" test and fails only
+the `5_000` row.
 
 ## Decision tables
 
@@ -32,6 +59,19 @@ or actually distinct in outcome). `OrderService.place_order`'s error handling is
 decision-table problem: {product exists?} x {stock sufficient?} x {payment
 succeeds?} x {idempotency key already used?} each independently flips the outcome.
 
+**Example.** Two yes/no questions decide what `place_order` does. Every combination
+is a row, and each row is one test:
+
+| Product exists? | Enough stock? | Payment OK? | Expected result |
+| --- | --- | --- | --- |
+| no | – | – | `ProductNotFoundError` (nothing reserved, nothing charged) |
+| yes | no | – | `InsufficientStockError` (payment never attempted) |
+| yes | yes | no | `PaymentDeclinedError`, stock **released** again |
+| yes | yes | yes | order is `PAID`, stock reduced |
+
+Notice "–": once an earlier condition fails, later ones are irrelevant. Writing the
+table is what makes that visible, and stops you writing 8 tests where 4 are enough.
+
 ## State transition testing
 
 For anything with a lifecycle — `OrderStatus`: `pending -> paid -> refunded`, or
@@ -41,6 +81,20 @@ one?). `InvalidOrderStateError` in this repo exists specifically to make illegal
 transitions a tested, intentional error rather than an accident of whatever the code
 happens to do. Draw the state diagram before writing the tests if it isn't obvious.
 
+**Example.** An order is created `pending`; a successful charge makes it `paid`; a
+declined charge makes it `cancelled` (stock is released); `cancel_order` on a `paid`
+order refunds it. Here is what `cancel_order` should do from each state:
+
+| Current status | `cancel_order` should… |
+| --- | --- |
+| pending | raise `InvalidOrderStateError` (nothing was paid yet) |
+| paid | refund the payment, restock, become `refunded` |
+| refunded | raise `InvalidOrderStateError` (already done) |
+| cancelled | raise `InvalidOrderStateError` |
+
+Three of the four rows are error cells, and they're the ones people forget. "Cancelling
+an already-refunded order returns 409" is a real test in module 11.
+
 ## Error paths, deliberately, not incidentally
 
 It's easy to write ten tests for the happy path and one vague `pytest.raises`
@@ -48,6 +102,19 @@ catch-all for "errors." Treat each distinct failure mode as its own first-class 
 with its own assertion on *which* exception and *what* the system state is
 afterward (did a partial write happen? was stock released? see
 `services/orders.py`'s compensation logic and module 09's transaction tests).
+
+```python
+# Vague: passes for ANY exception, including a typo'd NameError.
+with pytest.raises(Exception):
+    await service.place_order(...)
+
+# Deliberate: which error, what data, and what state was left behind.
+with pytest.raises(InsufficientStockError) as exc:
+    await service.place_order(requested_lines=[RequestedLine(1, 100)], ...)
+assert exc.value.available == 5
+assert (await repo.get(1)).stock_qty == 5        # nothing was reserved
+assert gateway.charge_calls == []                # and nobody was charged
+```
 
 ## Testing behavior, not implementation (again, concretely)
 
