@@ -7,7 +7,15 @@ from __future__ import annotations
 
 import pathlib
 
+import freezegun
 import pytest
+
+# On every freeze_time() start, freezegun getattr()s every attribute of every loaded
+# module. testcontainers.core.config has a lazy module attribute that calls
+# docker.from_env() -- with no Docker running that opens (and leaks) a unix socket to
+# the daemon, surfacing as a random, flaky "unclosed socket" ResourceWarning-as-error
+# in whichever test GC happens to run during. Keep freezegun out of it.
+freezegun.configure(extend_ignore_list=["testcontainers"])
 
 # Enables the `pytester` fixture (pytest's own "test pytest itself" plugin), used by
 # modules/03-fixtures to prove fixture teardown timing without fighting test-order

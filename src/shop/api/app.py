@@ -8,7 +8,7 @@ session) without any shared, leaking state between them.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import httpx
@@ -29,7 +29,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
 
     @asynccontextmanager
-    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         engine = build_engine(settings.database_url)
         sessionmaker = build_sessionmaker(engine)
         http_client = httpx.AsyncClient(base_url=settings.payment_gateway_url, timeout=5.0)
