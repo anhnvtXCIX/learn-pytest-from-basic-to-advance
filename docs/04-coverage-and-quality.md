@@ -108,7 +108,7 @@ stop trusting *any* red build. Common causes, and this repo's countermeasures:
   state between tests, full stop.
 
 > Fowler, "Eradicating Non-Determinism in Tests" —
-> https://martinfowler.com/articles/nonDeterminism.html — is the canonical reference
+> <https://martinfowler.com/articles/nonDeterminism.html> — is the canonical reference
 > and worth reading end to end once you've hit your first real flaky test.
 
 **Flaky tests, by cause:**

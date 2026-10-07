@@ -11,6 +11,7 @@ make test      # confirm you're green before changing anything
 
 Rules (from `pyproject.toml`'s `testpaths = ["modules", "src"]` plus pytest's
 defaults):
+
 - Files matching `test_*.py` or `*_test.py`.
 - Inside them, functions named `test_*` and classes named `Test*` (classes must have
   no `__init__`) with methods named `test_*`.
@@ -80,6 +81,6 @@ don't peek first.
 
 ## References
 
-- pytest docs, "How to invoke pytest" — https://docs.pytest.org/en/stable/how-to/usage.html
+- pytest docs, "How to invoke pytest" — <https://docs.pytest.org/en/stable/how-to/usage.html>
 - pytest docs, "Good Integration Practices" (discovery rules) —
-  https://docs.pytest.org/en/stable/explanation/goodpractices.html
+  <https://docs.pytest.org/en/stable/explanation/goodpractices.html>

@@ -7,13 +7,13 @@ modules cited inline.
 > This whole approach — a domain layer with no I/O, repositories as the only thing
 > that speaks to the database, a service layer that orchestrates via dependency
 > injection — is essentially the architecture from Percival & Gregory,
-> *Architecture Patterns with Python* (free): https://www.cosmicpython.com/book/preface.html.
+> *Architecture Patterns with Python* (free): <https://www.cosmicpython.com/book/preface.html>.
 > If this doc's shape resonates, that book is the deeper version of it.
 
 ## The layers, and what "testing" means at each one
 
 | Layer | What it is here | What to test | How |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `domain/` | Pure functions/dataclasses, no I/O | Every rule, every boundary, every invariant | Fast unit tests, parametrize, Hypothesis (modules 01-02, 12) |
 | `db/` (repositories) | The only code that speaks SQLAlchemy | That queries do what you think against a *real* engine — constraints, locking, transactions | Integration tests, both SQLite and Postgres tiers (modules 09-10) |
 | `gateways/` | Adapters to systems you don't own (HTTP, Redis) | Your adapter's request/response handling and error translation | respx for HTTP (module 08); fakes for unit tests, Testcontainers Redis for the real thing (module 10) |
