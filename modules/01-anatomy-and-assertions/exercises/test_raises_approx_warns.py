@@ -1,13 +1,15 @@
 """Exercise: raises / approx / warns.
 
-    make ex M=01
+make ex M=01
 """
 
 from __future__ import annotations
 
 import warnings
 
-from shop.domain.errors import PaymentDeclinedError
+import pytest
+
+from shop.domain.errors import InvalidOrderError, PaymentDeclinedError
 from shop.domain.pricing import calculate_discount_cents
 
 
@@ -22,7 +24,10 @@ def test_charge_over_limit_raises_payment_declined() -> None:
     # TODO: use pytest.raises to assert charge(150_000) raises PaymentDeclinedError,
     # AND assert on the exception's `.reason` attribute (don't use match= for this
     # one -- practice the `as excinfo` form instead).
-    raise NotImplementedError("write this test")
+    with pytest.raises(PaymentDeclinedError) as excinfo:
+        charge(150_000)
+
+    assert excinfo.value.reason == "amount exceeds limit"
 
 
 def test_discount_rate_as_a_percentage() -> None:
@@ -37,13 +42,14 @@ def test_discount_rate_as_a_percentage() -> None:
     effective_rate = discount / subtotal
 
     # TODO: assert effective_rate == pytest.approx(...) with the right expected value.
-    raise NotImplementedError("write this test")
+    assert effective_rate == pytest.approx(0.1)
 
 
 def test_negative_subtotal_raises_invalid_order_error() -> None:
     # TODO: assert that calculate_discount_cents(-100) raises InvalidOrderError,
     # using match= this time (its message mentions "negative").
-    raise NotImplementedError("write this test")
+    with pytest.raises(InvalidOrderError, match="negative"):
+        calculate_discount_cents(-100)
 
 
 def _old_calculate_discount(subtotal_cents: int) -> int:
@@ -58,4 +64,5 @@ def _old_calculate_discount(subtotal_cents: int) -> int:
 def test_old_calculate_discount_warns() -> None:
     # TODO: use pytest.warns to assert calling _old_calculate_discount(10_000) warns
     # with a DeprecationWarning matching "deprecated".
-    raise NotImplementedError("write this test")
+    with pytest.warns(DeprecationWarning, match="deprecated"):
+        _old_calculate_discount(100)
