@@ -17,7 +17,7 @@ for module 09's integration tests. Understanding that gap *is* part of this less
 five times, once per kind of test double, with a class implementing each:
 
 | Double | What it proves | Notice |
-|---|---|---|
+| --- | --- | --- |
 | `DummyPaymentGateway` | Payment is never attempted when stock fails first | Both methods raise if called at all |
 | `StubPaymentGateway` | The happy path reaches `PAID` | Canned answer, nothing recorded |
 | `SpyPaymentGateway` | The *correct amount and reference* were sent | Records calls; test asserts after the fact |
@@ -51,5 +51,5 @@ make ex M=05
 ## References
 
 - `docs/02-test-doubles.md`
-- Meszaros, "Test Double" — http://xunitpatterns.com/Test%20Double.html
-- Fowler, "Mocks Aren't Stubs" — https://martinfowler.com/articles/mocksArentStubs.html
+- Meszaros, "Test Double" — <http://xunitpatterns.com/Test%20Double.html>
+- Fowler, "Mocks Aren't Stubs" — <https://martinfowler.com/articles/mocksArentStubs.html>
