@@ -53,13 +53,15 @@ today.
 
 Same principle, an extra wrinkle specific to this repo: `docs/04-coverage-and-quality.md`'s
 module 03 aside already found that **`pytest-randomly` reseeds Python's global
-`random` state immediately before every test's call phase**, which silently defeats
-a fixture that tries to `random.seed(...)` during setup. If your code calls
-`random.random()` (or similar) directly, don't try to control it via seeding in a
-fixture in this repo — inject a `random.Random` instance (or a small `Protocol`, the
-same pattern as `Clock`) instead, and give the test a fixed one. See
-`examples/test_controlling_randomness.py` for both the seeding trap and the DI fix,
-side by side.
+`random` state immediately before every test's call phase** (its `pytest_runtest_call`
+hook, which runs before the test function starts). That silently defeats a *fixture*
+that tries to `random.seed(...)` during setup. Seeding inside the test body itself is
+fine, since it runs after the reseed. If your code calls `random.random()` (or
+similar) directly, don't try to control it via seeding in a fixture in this repo --
+inject a `random.Random` instance (or a small `Protocol`, the same pattern as
+`Clock`) instead, and give the test a fixed one. See
+`examples/test_controlling_randomness.py` for the body-seeding case that works, the
+fixture-seeding trap, and the DI fix.
 
 ## Environment variables: `monkeypatch.setenv`
 
