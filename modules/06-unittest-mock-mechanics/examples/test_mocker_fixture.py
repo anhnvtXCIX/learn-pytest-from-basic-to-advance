@@ -28,7 +28,9 @@ def mock_client(mocker) -> httpx.AsyncClient:
 
 
 def _fake_response(status_code: int, payload: dict) -> httpx.Response:
-    return httpx.Response(status_code=status_code, json=payload, request=httpx.Request("POST", "http://test"))
+    return httpx.Response(
+        status_code=status_code, json=payload, request=httpx.Request("POST", "http://test")
+    )
 
 
 async def test_mocker_patch_is_undone_automatically(mocker) -> None:

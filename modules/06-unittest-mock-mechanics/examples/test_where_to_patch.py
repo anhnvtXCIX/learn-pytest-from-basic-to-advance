@@ -1,4 +1,4 @@
-""""Where to patch" proven with two real, isolated pytest runs (pytester, from
+""" "Where to patch" proven with two real, isolated pytest runs (pytester, from
 module 03) instead of asserted in prose -- the whole point of this file is that this
 mistake is easy to make and easy to demonstrate.
 
