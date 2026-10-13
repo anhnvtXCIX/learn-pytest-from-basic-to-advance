@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import random
 
+import pytest
+
 
 def pick_discount_code_global(length: int = 6) -> str:
     """Reaches directly into the global `random` module -- hard to control in a test
@@ -16,19 +18,43 @@ def pick_discount_code_global(length: int = 6) -> str:
     return "".join(random.choice(alphabet) for _ in range(length))
 
 
-def test_seeding_random_in_the_test_body_does_not_reliably_control_it() -> None:
-    """This demonstrates the trap, it does not prove determinism -- read it as "here
-    is what does NOT work," not as a pattern to copy. Because pytest-randomly's
-    per-test reseed happens at the same point in the test lifecycle as this, the
-    actual value pick_discount_code_global() returns here varies run to run (try
-    running this file a few times with -p no:randomly vs without it and compare).
+@pytest.fixture
+def seeded_global_random() -> None:
+    random.seed(1234)
+
+
+def test_seeding_random_in_the_test_body_works() -> None:
+    """Seeding inside the test body is fine. pytest-randomly reseeds in its
+    `pytest_runtest_call` hook, which runs BEFORE the test function starts, so this
+    seed lands afterwards and wins. (Verified: same code every run, with and without
+    `-p no:randomly`.) The trap is only for seeding that happens EARLIER -- see below.
     """
     random.seed(1234)
-    code = pick_discount_code_global()
+    first = pick_discount_code_global()
+    random.seed(1234)
+    second = pick_discount_code_global()
 
-    assert len(code) == 6
-    assert code.isalpha()
-    # Deliberately NOT asserting a specific code value here -- see the docstring.
+    assert first == second
+
+
+def test_seeding_random_in_a_fixture_is_overwritten_by_pytest_randomly(
+    seeded_global_random: None, request: pytest.FixtureRequest
+) -> None:
+    """The actual trap: a fixture's `random.seed(1234)` runs in the setup phase, then
+    pytest-randomly reseeds right before the call phase and silently discards it.
+    The test body therefore does NOT see the fixture's seed.
+
+    Only meaningful with the plugin active; with `-p no:randomly` the fixture's seed
+    survives, so there is nothing to demonstrate and we skip.
+    """
+    if not request.config.pluginmanager.hasplugin("randomly"):
+        pytest.skip("pytest-randomly is disabled, so the fixture's seed survives")
+
+    code = pick_discount_code_global()
+    what_seed_1234_would_give = InjectedRandomSource(random.Random(1234)).pick_discount_code()
+
+    # 26**-6 chance of a false failure by coincidence -- negligible.
+    assert code != what_seed_1234_would_give
 
 
 class InjectedRandomSource:
