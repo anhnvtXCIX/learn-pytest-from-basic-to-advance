@@ -18,6 +18,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 
 import pytest
+import pytest_asyncio
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 
@@ -25,7 +26,9 @@ from shop.db import tables  # noqa: F401
 from shop.db.base import Base
 
 
-@pytest.fixture(scope="module")  # TODO: needs to be pytest_asyncio.fixture with loop_scope="module"
+@pytest_asyncio.fixture(
+    scope="module", loop_scope="module"
+)  # TODO: needs to be pytest_asyncio.fixture with loop_scope="module"
 async def engine() -> AsyncIterator[AsyncEngine]:
     eng = create_async_engine("sqlite+aiosqlite:///:memory:")
 
