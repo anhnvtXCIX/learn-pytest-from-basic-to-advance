@@ -9,17 +9,20 @@ covers a different, often better, tool for the same job: **respx**, which mocks
 `create_autospec(httpx.AsyncClient)` (module 06) replaces the whole client. That
 means none of `httpx`'s own logic runs: no real URL joining (`base_url` +
 path), no real header merging, no real JSON encoding. If `HttpPaymentGateway`
-had a bug in its URL — say, a missing leading slash that silently changed where
-the request actually went — an autospec'd-client test wouldn't notice, because
-your test never asked httpx to build a URL at all; it just recorded what
-arguments you *told* the mock you called.
+had a bug in its URL — say, a typo'd path like `/v1/charge` instead of
+`/v1/charges` — an autospec'd-client test wouldn't notice, because your test
+never asked httpx to build a URL at all; it just recorded what arguments you
+*told* the mock you called.
 
-respx instead installs a custom transport at the bottom of a *real*
-`httpx.AsyncClient`. Your production code runs entirely unmodified up to the
-point of actually opening a socket — real URL construction, real header
-merging, real JSON serialization — and respx intercepts just before the bytes
-would hit the network, matching the request against routes you declare and
-returning a canned response. `examples/test_respx_catches_url_bugs.py` proves
+respx instead leaves a *real* `httpx.AsyncClient` in place and, by default,
+patches `httpcore` (the layer underneath `httpx` that manages connections). Your
+production code runs entirely unmodified up to the point of actually opening a
+socket — real URL construction, real header merging, real JSON serialization —
+and respx intercepts just before the bytes would hit the network, matching the
+request against routes you declare and returning a canned response. (This is a
+different mechanism from `httpx.MockTransport`, which you pass to the client
+yourself; respx can also patch `httpx`'s own transports instead, via
+`respx.mock(using="httpx")`.) `examples/test_respx_catches_url_bugs.py` proves
 this concretely: the exact same test setup, run against a `HttpPaymentGateway`
 with a deliberately wrong URL, fails with "no route matched" — a bug an
 autospec'd-client test would have missed entirely.
@@ -38,8 +41,8 @@ async def test_charge_succeeds():
     ...
 ```
 
-`@respx.mock` (or the `respx_mock` fixture from `pytest-respx`... this repo uses the
-decorator/context-manager form directly) activates interception for the test;
+`@respx.mock` (or the `respx_mock` fixture that respx's own pytest plugin provides;
+this repo uses the decorator/context-manager form directly) activates interception for the test;
 anything not matched by a declared route raises, so a request going somewhere
 unexpected fails loudly instead of silently hitting the real network.
 
@@ -60,8 +63,14 @@ respx.post(url).mock(return_value=httpx.Response(500))
 
 Both should map to `PaymentGatewayUnavailableError` per `HttpPaymentGateway`'s own
 translation logic — this is the right layer to test that translation, since it's
-`HttpPaymentGateway`'s job specifically (`OrderService` never sees an `httpx`
-exception at all, by design).
+`HttpPaymentGateway`'s job specifically. For timeouts, connection errors and 5xx,
+`OrderService` never sees an `httpx` exception, by design.
+
+The translation is deliberately **incomplete**, as a follow-up exercise for you to
+explore: a 4xx other than 402 leaks `httpx.HTTPStatusError`, a malformed 402 or 201
+body leaks `JSONDecodeError`, `AttributeError` or `KeyError`, and `refund` has no 402
+handling at all. Try writing a respx test for each and decide what the gateway
+*should* raise.
 
 ## Why `OrderService` doesn't retry a failed charge itself
 
@@ -102,5 +111,5 @@ make ex M=08
 
 ## References
 
-- respx docs — https://lundberg.github.io/respx/
-- httpx docs, `MockTransport` — https://www.python-httpx.org/advanced/transports/#mock-transports
+- respx docs — <https://lundberg.github.io/respx/>
+- httpx docs, `MockTransport` — <https://www.python-httpx.org/advanced/transports/#mock-transports>
