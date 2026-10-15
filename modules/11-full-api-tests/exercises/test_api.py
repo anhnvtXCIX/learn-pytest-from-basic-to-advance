@@ -1,6 +1,6 @@
 """Exercise: full-stack API tests.
 
-    make ex M=11
+make ex M=11
 """
 
 from __future__ import annotations
@@ -18,7 +18,29 @@ async def test_create_order_returns_the_right_json_shape(
     full OrderOut contract (src/shop/api/schemas.py) is actually present, not just
     the couple of fields other tests happen to check.
     """
-    raise NotImplementedError("write this test")
+    response = await client.post(
+        "/orders",
+        headers=auth_headers,
+        json={
+            "customer_ref": "cust-1",
+            "lines": [{"product_id": seeded_product.id, "quantity": 1}],
+            "idempotency_key": "exercise-key-1",
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    print()
+    assert "id" in body
+    assert "customer_ref" in body
+    assert "status" in body
+    assert "lines" in body
+    assert "subtotal_cents" in body
+    assert "discount_cents" in body
+    assert "tax_cents" in body
+    assert "total_cents" in body
+    assert "payment_reference" in body
+    assert "created_at" in body
 
 
 async def test_replaying_the_same_idempotency_key_ignores_a_different_payload(
@@ -31,7 +53,33 @@ async def test_replaying_the_same_idempotency_key_ignores_a_different_payload(
     quantity=3 price -- proving the replay short-circuits before re-pricing anything,
     exactly as services/orders.py's `place_order` comment says it should.
     """
-    raise NotImplementedError("write this test")
+    # First try
+    response_1 = await client.post(
+        "/orders",
+        headers=auth_headers,
+        json={
+            "customer_ref": "cust-1",
+            "lines": [{"product_id": seeded_product.id, "quantity": 1}],
+            "idempotency_key": "exercise-key",
+        },
+    )
+
+    # Create order the second time
+    response_2 = await client.post(
+        "/orders",
+        headers=auth_headers,
+        json={
+            "customer_ref": "cust-1",
+            "lines": [{"product_id": seeded_product.id, "quantity": 3}],
+            "idempotency_key": "exercise-key",
+        },
+    )
+
+    assert response_1.status_code == response_2.status_code == 201
+
+    order_1, order_2 = response_1.json(), response_2.json()
+    assert order_1["id"] == order_2["id"]
+    assert order_1["total_cents"] == order_2["total_cents"]
 
 
 async def test_cancelling_an_already_refunded_order_is_409(
@@ -42,4 +90,30 @@ async def test_cancelling_an_already_refunded_order_is_409(
     already-refunded order isn't a valid target for cancel_order -- see
     InvalidOrderStateError in services/orders.py).
     """
-    raise NotImplementedError("write this test")
+    repsonse_1 = await client.post(
+        "/orders",
+        headers=auth_headers,
+        json={
+            "customer_ref": "cust-1",
+            "lines": [{"product_id": seeded_product.id, "quantity": 1}],
+            "idempotency_key": "exercise-key",
+        },
+    )
+
+    order_id = repsonse_1.json()["id"]
+
+    # Cancel the order first time
+    resp_cancel_1 = await client.post(
+        f"/orders/{order_id}/cancel",
+        headers=auth_headers,
+    )
+
+    assert resp_cancel_1.status_code == 200
+
+    # Second attempt to cancel the order
+    resp_cancel_1 = await client.post(
+        f"/orders/{order_id}/cancel",
+        headers=auth_headers,
+    )
+
+    assert resp_cancel_1.status_code == 409
