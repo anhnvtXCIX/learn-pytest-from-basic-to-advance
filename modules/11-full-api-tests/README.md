@@ -15,6 +15,25 @@ in an `httpx.AsyncClient`. `seeded_product` uses `polyfactory`'s `DataclassFacto
 to build a valid `Product` with only the fields a given test cares about overridden
 — the factory pattern module 03 built by hand, generalized.
 
+## Why SQLite here, not Postgres?
+
+Module 10 shows what SQLite can't tell you (row-level locking, dialect-specific
+behavior, how a unique violation is reported). This module still uses it, for two
+reasons:
+
+- **It runs without Docker.** `make test` must stay green with no Docker and no
+  network, and `docker`-marked tests are deselected by default. Full-API tests on
+  Postgres would only run under `make test-docker`.
+- **It tests something else.** This module is about wiring the whole stack together:
+  routing, validation, `dependency_overrides`, and one fake at the payment boundary.
+  For that, a fast in-memory database with module 09's rollback-per-test pattern is
+  real enough.
+
+The cost is the same one module 10 documents: a green test here says nothing about
+behavior that differs between SQLite and Postgres. If a bug depends on that
+difference, such as concurrent stock reservation, the test belongs in module 10's
+Postgres tier.
+
 ## Bug found #1: a genuinely deprecated stdlib-adjacent constant
 
 Building this module's error-path tests immediately failed with:
@@ -98,7 +117,7 @@ make ex M=11
 
 ## References
 
-- FastAPI docs, testing — https://fastapi.tiangolo.com/tutorial/testing/
+- FastAPI docs, testing — <https://fastapi.tiangolo.com/tutorial/testing/>
 - FastAPI docs, "Testing Dependencies with Overrides" —
-  https://fastapi.tiangolo.com/advanced/testing-dependencies/
-- polyfactory docs — https://polyfactory.litestar.dev/
+  <https://fastapi.tiangolo.com/advanced/testing-dependencies/>
+- polyfactory docs — <https://polyfactory.litestar.dev/>
