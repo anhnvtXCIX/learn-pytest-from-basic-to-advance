@@ -31,7 +31,7 @@ sharing one session-scoped engine — each just opening a connection and running
 plain `SELECT` — showed a bizarre pattern: **the first always passed, the second
 always failed**, regardless of which test ran first or what either query was, with
 
-```
+``` python
 asyncpg.exceptions.InterfaceError: cannot rollback; the transaction is in error state
 ```
 
@@ -117,8 +117,8 @@ since `-m exercise` on the command line replaces the default marker filter entir
 
 ## References
 
-- Testcontainers for Python docs — https://testcontainers-python.readthedocs.io/
+- Testcontainers for Python docs — <https://testcontainers-python.readthedocs.io/>
 - SQLAlchemy docs, connection pooling (`NullPool`) —
-  https://docs.sqlalchemy.org/en/20/core/pooling.html
+  <https://docs.sqlalchemy.org/en/20/core/pooling.html>
 - PostgreSQL docs, "Errors and Rollbacks" (the aborted-transaction behavior) —
-  https://www.postgresql.org/docs/current/tutorial-transactions.html
+  <https://www.postgresql.org/docs/current/tutorial-transactions.html>
