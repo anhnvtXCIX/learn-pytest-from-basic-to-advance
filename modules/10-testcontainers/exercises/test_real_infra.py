@@ -6,8 +6,18 @@ Requires Docker running:
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
-from sqlalchemy.ext.asyncio import AsyncEngine
+import redis.asyncio as redis
+from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
+
+from shop.db.repository import ProductRepository
+from shop.db.tables import ProductRow
+from shop.domain.errors import InsufficientStockError
+from shop.domain.models import Product
+from shop.gateways.cache import RedisIdempotencyLock
 
 pytestmark = pytest.mark.docker
 
@@ -20,7 +30,17 @@ async def test_redis_lock_round_trip(redis_url: str) -> None:
     ideally `await client.flushdb()` first so this test doesn't depend on state left
     by another test using the same key.
     """
-    raise NotImplementedError("write this test")
+    client = redis.from_url(redis_url)
+    lock = RedisIdempotencyLock(client)
+
+    acquired_first = await lock.acquire("k", ttl_seconds=30)
+    acquired_second = await lock.acquire("k", ttl_seconds=30)
+
+    assert acquired_first is True
+    assert acquired_second is False
+
+    await client.flushdb()
+    await client.aclose()
 
 
 async def test_only_one_of_two_concurrent_requests_for_two_units_succeeds(
@@ -35,4 +55,35 @@ async def test_only_one_of_two_concurrent_requests_for_two_units_succeeds(
     Clean up the seeded row afterward (a `finally` block, deleting by sku, works well
     -- again see examples/test_concurrency.py).
     """
-    raise NotImplementedError("write this test")
+    async with AsyncSession(engine) as session:
+        repo = ProductRepository(session)
+        product = await repo.add(
+            Product(id=1, sku="NOPE", name="Nope", unit_price_cents=1_000, stock_qty=2)
+        )
+
+        await session.commit()
+        product_id = product.id
+
+    async def try_reserve() -> bool:
+        async with AsyncSession(engine) as session:
+            repo = ProductRepository(session)
+
+            try:
+                await repo.reserve_stock(product_id, 2)
+            except InsufficientStockError:
+                await session.rollback()
+                return False
+            else:
+                await session.commit()
+                return True
+
+    try:
+        results = await asyncio.gather(try_reserve(), try_reserve())
+
+        assert sorted(results) == [False, True], (
+            "exactly one reservation should succeed for a single unit of stock"
+        )
+    finally:
+        async with AsyncSession(engine) as session:
+            await session.execute(delete(ProductRow).where(ProductRow.sku == "NOPE"))
+            await session.commit()
