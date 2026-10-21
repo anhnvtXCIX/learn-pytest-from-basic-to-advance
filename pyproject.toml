@@ -55,10 +55,7 @@ dev = [
     "testcontainers[postgres,redis]>=4.15",
     "freezegun>=1.5",
 ]
-lint = [
-    "ruff>=0.16",
-    "mypy>=2.3",
-]
+lint = ["ruff>=0.16", "mypy>=2.3"]
 
 [tool.uv]
 default-groups = ["dev", "lint"]

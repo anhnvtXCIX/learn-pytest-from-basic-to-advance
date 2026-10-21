@@ -13,6 +13,7 @@ and confirming `test_should_be_marked_unit` shows up.
 
 from __future__ import annotations
 
+import sys
 import warnings
 
 import pytest
@@ -22,10 +23,12 @@ from shop.domain.pricing import calculate_discount_cents
 
 
 # TODO: add @pytest.mark.unit to this test (it's already registered in pyproject.toml).
+@pytest.mark.unit
 def test_should_be_marked_unit() -> None:
     assert calculate_discount_cents(0) == 0
 
 
+@pytest.mark.skipif(sys.version_info < (3, 13), reason="uses a 3.13+ typing feature")
 def test_skip_on_old_python() -> None:
     """TODO: add @pytest.mark.skipif above this function, skipping when
     sys.version_info is less than (3, 13), with a reason mentioning what feature
@@ -34,6 +37,7 @@ def test_skip_on_old_python() -> None:
     assert True
 
 
+@pytest.mark.xfail(reason="deliberately to be failed on purpose", strict=True)
 def test_a_case_that_is_currently_genuinely_broken() -> None:
     """This assertion is wrong on purpose (a stand-in for a real, tracked bug).
     TODO: add @pytest.mark.xfail above this function with a reason, and strict=True
@@ -47,6 +51,7 @@ def _emits_a_warning() -> int:
     return 1
 
 
+@pytest.mark.filterwarnings("ignore::UserWarning")
 def test_the_warning_is_expected_here() -> None:
     """TODO: add @pytest.mark.filterwarnings("ignore::UserWarning") above this
     function so the warning from _emits_a_warning() doesn't fail the test under this

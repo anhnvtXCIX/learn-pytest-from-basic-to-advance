@@ -1,6 +1,6 @@
 """Exercise: parametrize, ids, indirect.
 
-    make ex M=02
+make ex M=02
 """
 
 from __future__ import annotations
@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 
 from shop.domain.models import OrderLine
-from shop.domain.pricing import calculate_subtotal_cents
+from shop.domain.pricing import calculate_subtotal_cents, calculate_tax_cents
 
 
 @pytest.mark.parametrize(
@@ -22,10 +22,23 @@ from shop.domain.pricing import calculate_subtotal_cents
 )
 def test_tax_at_various_rates(taxable_cents: int, tax_rate: float, expected_tax_cents: int) -> None:
     # TODO: this decorator is already complete -- just write the assertion.
-    raise NotImplementedError("write this test")
+    tax_cents = calculate_tax_cents(taxable_cents, tax_rate)
+
+    assert tax_cents == expected_tax_cents
 
 
-def test_write_your_own_parametrize_decorator() -> None:
+@pytest.mark.parametrize(
+    "lines,expected_subtotal",
+    [
+        ([(1, 999)], 999),  # a single line
+        ([(5, 200)], 1_000),
+        ([(2, 100), (3, 50)], 350),  # two lines
+    ],
+    ids=["a_single_line_under_2000", "a_single_line_1000", "two_lines"],
+)
+def test_write_your_own_parametrize_decorator(
+    lines: list[tuple[int, int]], expected_subtotal: int
+) -> None:
     """TODO: this test currently has no decorator at all. Add a
     `@pytest.mark.parametrize` decorator above this function (you'll need to change
     the signature too) covering these three cases for `calculate_subtotal_cents`,
@@ -38,7 +51,14 @@ def test_write_your_own_parametrize_decorator() -> None:
     Build the OrderLine object(s) inside the test body from whatever parameters you
     chose to pass in.
     """
-    raise NotImplementedError("add a parametrize decorator and implement this test")
+    lineItems = [
+        OrderLine(product_id=i, quantity=quantity, unit_price_cents=unit_price_cents)
+        for i, (quantity, unit_price_cents) in enumerate(lines, start=1)
+    ]
+
+    subtotal = calculate_subtotal_cents(lineItems)
+
+    assert subtotal == expected_subtotal
 
 
 @pytest.mark.parametrize(
@@ -47,6 +67,8 @@ def test_write_your_own_parametrize_decorator() -> None:
         # TODO: add at least two (cart, expected_subtotal) cases here. `cart` is a
         # list of (quantity, unit_price_cents) tuples -- it goes through the `cart`
         # fixture in conftest.py before this test sees it (that's what indirect does).
+        ([(2, 300)], 600),
+        ([(3, 400), (4, 500)], 3_200),
     ],
     indirect=["cart"],
 )

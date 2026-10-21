@@ -8,7 +8,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from shop.domain.models import Order, OrderLine, OrderStatus, OrderTotals
+import pytest
+from sqlalchemy.exc import IntegrityError
+
+from shop.db.repository import ProductRepository
+from shop.db.uow import UnitOfWork
+from shop.domain.models import Order, OrderLine, OrderStatus, OrderTotals, Product
 
 
 async def test_rollback_isolates_this_test_from_the_next_one(sessionmaker) -> None:
@@ -17,12 +22,38 @@ async def test_rollback_isolates_this_test_from_the_next_one(sessionmaker) -> No
     thing with the same sku -- if this doesn't roll back cleanly, that test will fail
     with a UNIQUE constraint error.
     """
-    raise NotImplementedError("write this test")
+    async with sessionmaker() as session:
+        repo = ProductRepository(session)
+
+        await repo.add(
+            Product(
+                id=1,
+                sku="EXERCISE-SHARED-SKU",
+                name="ABC",
+                unit_price_cents=1_000,
+                stock_qty=10,
+            )
+        )
+
+        await session.commit()
 
 
 async def test_rollback_isolates_this_test_from_the_previous_one(sessionmaker) -> None:
     # TODO: same as above -- same sku, same pattern. If it passes, rollback worked.
-    raise NotImplementedError("write this test")
+    async with sessionmaker() as session:
+        repo = ProductRepository(session)
+
+        await repo.add(
+            Product(
+                id=1,
+                sku="EXERCISE-SHARED-SKU",
+                name="ABC",
+                unit_price_cents=1_000,
+                stock_qty=10,
+            )
+        )
+
+        await session.commit()
 
 
 def _make_order(product_id: int, idempotency_key: str) -> Order:
@@ -44,4 +75,20 @@ async def test_duplicate_idempotency_key_is_rejected_by_the_database(sessionmake
     (Check examples/test_sqlite_limitations.py if you get stuck on where exactly the
     error surfaces.)
     """
-    raise NotImplementedError("write this test")
+    product_id = 1
+    idempotency_key = "dup-key"
+
+    async with UnitOfWork(sessionmaker) as uow:
+        plenty = await uow.products.add(
+            Product(
+                id=product_id, sku="PLENTY-OF-STOCK", name="A", unit_price_cents=1_000, stock_qty=10
+            )
+        )
+        order = _make_order(plenty.id, idempotency_key)
+        await uow.orders.add(order)
+
+        await uow.commit()
+
+    async with UnitOfWork(sessionmaker) as second_uow:
+        with pytest.raises(IntegrityError):
+            await second_uow.orders.add(_make_order(product_id, idempotency_key))
