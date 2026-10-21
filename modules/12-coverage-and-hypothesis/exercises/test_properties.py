@@ -1,6 +1,6 @@
 """Exercise: Hypothesis properties and stateful testing.
 
-    make ex M=12
+make ex M=12
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ from hypothesis import strategies as st
 from hypothesis.stateful import RuleBasedStateMachine, invariant, rule
 
 from shop.domain.models import OrderLine
+from shop.domain.pricing import calculate_subtotal_cents
 
 order_lines_strategy = st.lists(
     st.builds(
@@ -27,7 +28,7 @@ order_lines_strategy = st.lists(
 def test_subtotal_is_never_negative(lines: list[OrderLine]) -> None:
     # TODO: assert calculate_subtotal_cents(lines) >= 0 -- a one-line property, but
     # notice Hypothesis still generates dozens of varied cases to check it against.
-    raise NotImplementedError("write this test")
+    assert calculate_subtotal_cents(lines) >= 0
 
 
 @given(order_lines_strategy)
@@ -38,7 +39,18 @@ def test_subtotal_scales_with_a_uniform_price_increase(lines: list[OrderLine]) -
     more specific property than "isn't negative" -- it pins down the actual
     relationship, not just a sanity bound.
     """
-    raise NotImplementedError("write this test")
+    order_lines = [
+        OrderLine(
+            product_id=line.product_id,
+            quantity=line.quantity,
+            unit_price_cents=line.unit_price_cents + 100,
+        )
+        for line in lines
+    ]
+
+    assert calculate_subtotal_cents(order_lines) == calculate_subtotal_cents(lines) + 100 * sum(
+        [line.quantity for line in lines]
+    )
 
 
 class CounterModel:
@@ -66,18 +78,19 @@ class CounterMachine(RuleBasedStateMachine):
     @rule()
     def increment(self) -> None:
         # TODO: call self.model.increment()
-        raise NotImplementedError("implement this rule")
+        self.model.increment()
 
     @rule()
     def decrement(self) -> None:
         # TODO: only call self.model.decrement() if self.model.value > 0 -- guard
         # the same way StockMachine's `release` rule guards its precondition.
-        raise NotImplementedError("implement this rule")
+        if self.model.value > 0:
+            self.model.decrement()
 
     @invariant()
     def value_never_negative(self) -> None:
         # TODO: assert self.model.value >= 0
-        raise NotImplementedError("implement this invariant")
+        assert self.model.value >= 0
 
 
 TestCounterMachine = CounterMachine.TestCase
